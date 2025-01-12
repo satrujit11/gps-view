@@ -19,18 +19,15 @@ function MyComponent() {
   const [devices, setDevices] = useState<Device[]>([])
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
-  const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null)
+  const [searchQuery, setSearchQuery] = useState('') // State for search input
 
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map)
 
-    // Fetch devices data
     const fetchDevices = async () => {
-      const fetchedDevices = await getDevices() // Assuming this returns an array of device data
-      console.log(fetchedDevices)
+      const fetchedDevices = await getDevices()
       setDevices(fetchedDevices)
 
-      // Center the map based on the bounds of the device locations
       const bounds = new window.google.maps.LatLngBounds()
       fetchedDevices.forEach((device: Device) => {
         bounds.extend({
@@ -38,27 +35,22 @@ function MyComponent() {
           lng: parseFloat(device.longitude),
         })
       })
-      map.fitBounds(bounds) // Adjust map to fit the bounds of all device locations
+      map.fitBounds(bounds)
     }
 
     fetchDevices()
 
-    // Get the user's current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
           setUserLocation({ lat: latitude, lng: longitude })
-          map.setCenter({ lat: latitude, lng: longitude }) // Center the map on the user's location
+          map.setCenter({ lat: latitude, lng: longitude })
         },
-        (error) => {
-          console.error('Error getting location', error)
-          // You could set a default location if needed
-          setUserLocation({ lat: 37.7749, lng: -122.4194 }) // Default to San Francisco, for example
+        () => {
+          setUserLocation({ lat: 37.7749, lng: -122.4194 }) // Default to San Francisco
         }
       )
-    } else {
-      console.error('Geolocation not supported by this browser.')
     }
   }, [])
 
@@ -69,82 +61,120 @@ function MyComponent() {
   const handleMarkerClick = (device: Device) => {
     setSelectedDevice(device)
 
-    if (infoWindow) {
-      infoWindow.close() // Close any previously opened InfoWindow
-    }
-
-    // Create an InfoWindow for the clicked marker with Tailwind classes
-    const newInfoWindow = new google.maps.InfoWindow({
-      content: `<div class="bg-white p-4 rounded-lg shadow-lg w-64">
-                  <h3 class="text-xl font-semibold text-gray-800 mb-2">Device ID: ${device.deviceId}</h3>
-                  <p class="text-sm text-gray-600 mb-1">Status: <span class="font-medium ${device.status ? 'text-green-500' : 'text-red-500'}">${device.status ? 'Active' : 'Inactive'}</span></p>
-                  <p class="text-sm text-gray-600 mb-1">Latitude: <span class="font-medium">${device.latitude}</span></p>
-                  <p class="text-sm text-gray-600 mb-1">Longitude: <span class="font-medium">${device.longitude}</span></p>
-                  <p class="text-sm text-gray-600">Valid Data: <span class="font-medium ${device.validData ? 'text-green-500' : 'text-red-500'}">${device.validData ? 'Yes' : 'No'}</span></p>
-                </div>`,
-    })
-
-    newInfoWindow.open(map, new google.maps.Marker({
-      position: {
+    if (map) {
+      map.setCenter({
         lat: parseFloat(device.latitude),
         lng: parseFloat(device.longitude),
-      },
-    }))
-    setInfoWindow(newInfoWindow)
+      })
+      map.setZoom(12) // Optionally zoom in when a marker is clicked
+    }
   }
 
-  useEffect(() => {
-    // Initial map setup, but devices will be fetched dynamically inside `onLoad`
-  }, [])
+  const handleSearch = () => {
+    const device = devices.find((d) => d.deviceId === searchQuery)
+    if (device) {
+      setSelectedDevice(device)
+
+      if (map) {
+        map.setCenter({
+          lat: parseFloat(device.latitude),
+          lng: parseFloat(device.longitude),
+        })
+        map.setZoom(12)
+      }
+    } else {
+      alert('Device not found!')
+    }
+  }
 
   return isLoaded ? (
-    <GoogleMap
-      mapContainerStyle={containerStyle}
-      zoom={2}
-      center={userLocation || { lat: 37.7749, lng: -122.4194 }} // Default to San Francisco
-      onLoad={onLoad}
-      onUnmount={onUnmount}
-    >
-      {devices.map((device) => (
-        <Marker
-          key={device.deviceId}
-          position={{
-            lat: parseFloat(device.latitude),
-            lng: parseFloat(device.longitude),
-          }}
-          label={device.deviceId}
-          icon={
-            device.status
-              ? 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
-              : 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
-          }
-          onClick={() => handleMarkerClick(device)} // Handle marker click
+    <div>
+      {/* Search Section */}
+      <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg z-10">
+        <input
+          type="text"
+          className="border border-gray-300 rounded p-2 w-64"
+          placeholder="Enter Device ID"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
-      ))}
-
-      {/* Optional: Display additional information about the selected device */}
-      {selectedDevice && (
-        <InfoWindow
-          position={{
-            lat: parseFloat(selectedDevice.latitude),
-            lng: parseFloat(selectedDevice.longitude),
-          }}
-          onCloseClick={() => setSelectedDevice(null)} // Close InfoWindow when closed
+        <button
+          onClick={handleSearch}
+          className="ml-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
-          <div className="bg-white p-4 rounded-lg shadow-lg w-64">
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Device ID: {selectedDevice.deviceId}</h3>
-            <p className="text-sm text-gray-600 mb-1">Status: <span className={`font-medium ${selectedDevice.status ? 'text-green-500' : 'text-red-500'}`}>{selectedDevice.status ? 'Active' : 'Inactive'}</span></p>
-            <p className="text-sm text-gray-600 mb-1">Latitude: <span className="font-medium">{selectedDevice.latitude}</span></p>
-            <p className="text-sm text-gray-600 mb-1">Longitude: <span className="font-medium">{selectedDevice.longitude}</span></p>
-            <p className="text-sm text-gray-600">Valid Data: <span className={`font-medium ${selectedDevice.validData ? 'text-green-500' : 'text-red-500'}`}>{selectedDevice.validData ? 'Yes' : 'No'}</span></p>
-          </div>
-        </InfoWindow>
-      )}
-    </GoogleMap>
+          Search
+        </button>
+      </div>
+
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        zoom={2}
+        center={userLocation || { lat: 37.7749, lng: -122.4194 }}
+        onLoad={onLoad}
+        onUnmount={onUnmount}
+      >
+        {devices.map((device) => (
+          <Marker
+            key={device.deviceId}
+            position={{
+              lat: parseFloat(device.latitude),
+              lng: parseFloat(device.longitude),
+            }}
+            label={device.deviceId}
+            icon={
+              device.status
+                ? 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                : 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+            }
+            onClick={() => handleMarkerClick(device)} // Show InfoWindow on marker click
+          />
+        ))}
+
+        {/* InfoWindow for the selected device */}
+        {selectedDevice && (
+          <InfoWindow
+            position={{
+              lat: parseFloat(selectedDevice.latitude),
+              lng: parseFloat(selectedDevice.longitude),
+            }}
+            onCloseClick={() => setSelectedDevice(null)} // Close InfoWindow when closed
+          >
+            <div className="bg-white p-4 rounded-lg shadow-lg w-64">
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Device ID: {selectedDevice.deviceId}</h3>
+              <p className="text-sm text-gray-600 mb-1">
+                Status:{' '}
+                <span
+                  className={`font-medium ${selectedDevice.status ? 'text-green-500' : 'text-red-500'
+                    }`}
+                >
+                  {selectedDevice.status ? 'Active' : 'Inactive'}
+                </span>
+              </p>
+              <p className="text-sm text-gray-600 mb-1">
+                Latitude: <span className="font-medium">{selectedDevice.latitude}</span>
+              </p>
+              <p className="text-sm text-gray-600 mb-1">
+                Longitude: <span className="font-medium">{selectedDevice.longitude}</span>
+              </p>
+              <p className="text-sm text-gray-600">
+                Valid Data:{' '}
+                <span
+                  className={`font-medium ${selectedDevice.validData ? 'text-green-500' : 'text-red-500'
+                    }`}
+                >
+                  {selectedDevice.validData ? 'Yes' : 'No'}
+                </span>
+              </p>
+            </div>
+          </InfoWindow>
+        )}
+      </GoogleMap>
+    </div>
   ) : (
     <></>
   )
 }
 
 export default React.memo(MyComponent)
+
 
