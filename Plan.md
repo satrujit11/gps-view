@@ -1,0 +1,6 @@
+- [x] Setup Tanstack Query and integrate it
+- [x] Setup Shadcn UI
+- [x] Modify UI little
+- [x] Add Delete confirmtion button
+- [x] Add status update toggle
+- [x] Add edit device functionality

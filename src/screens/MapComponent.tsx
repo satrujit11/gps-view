@@ -1,6 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api'
 import { getDevices } from '../apis/devices'
+import { GiHamburgerMenu } from 'react-icons/gi'
+import InfoWindowComponent from './components/infoWindow.component'
+import SidebarComponent from './components/sidebar.component'
+import { MdClose } from 'react-icons/md'
+import { useQuery } from '@tanstack/react-query'
 
 const containerStyle = {
   width: '100vw',
@@ -19,15 +24,31 @@ function MyComponent() {
   const [devices, setDevices] = useState<Device[]>([])
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
-  const [searchQuery, setSearchQuery] = useState('') // State for search input
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const onLoad = useCallback((map: google.maps.Map) => {
-    setMap(map)
+  const sidebarRef = useRef<HTMLDivElement>(null)
 
-    const fetchDevices = async () => {
-      const fetchedDevices = await getDevices()
-      setDevices(fetchedDevices)
 
+  const { data } = useQuery({
+    queryKey: ['devices'],
+    queryFn: () => getDevices(),
+  })
+
+  useEffect(() => {
+    if (data) {
+      setDevices(data)
+      updateMapBounds(data)
+      if (selectedDevice != null) {
+        const tempDevice = data.find((device: Device) => device.deviceId === selectedDevice.deviceId)
+        setSelectedDevice(tempDevice)
+      }
+    }
+  }, [data])
+
+  // Update map bounds based on the new set of devices
+  const updateMapBounds = (fetchedDevices: Device[]) => {
+    if (map) {
       const bounds = new window.google.maps.LatLngBounds()
       fetchedDevices.forEach((device: Device) => {
         bounds.extend({
@@ -37,8 +58,11 @@ function MyComponent() {
       })
       map.fitBounds(bounds)
     }
+  }
 
-    fetchDevices()
+
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map)
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -66,55 +90,117 @@ function MyComponent() {
         lat: parseFloat(device.latitude),
         lng: parseFloat(device.longitude),
       })
-      map.setZoom(12) // Optionally zoom in when a marker is clicked
+      map.setZoom(12)
     }
   }
 
   const handleSearch = () => {
-    const device = devices.find((d) => d.deviceId === searchQuery)
+    const device = devices.find((d) => d.deviceId === searchQuery);
     if (device) {
-      setSelectedDevice(device)
+      setSelectedDevice(null); // Reset the previous selection
+      setTimeout(() => {
+        setSelectedDevice(device); // Set the new selected device
+      }, 100)
 
       if (map) {
         map.setCenter({
           lat: parseFloat(device.latitude),
           lng: parseFloat(device.longitude),
-        })
-        map.setZoom(12)
+        });
+        map.setZoom(12);
       }
     } else {
-      alert('Device not found!')
+      alert("Device not found!");
+    }
+  };
+
+  const handleSelectedDevice = (device: Device) => {
+    setSelectedDevice(device)
+    if (map) {
+      map.setCenter({
+        lat: parseFloat(device.latitude),
+        lng: parseFloat(device.longitude),
+      })
+      map.setZoom(12)
     }
   }
 
+
+  const toggleSidebar = () => {
+    setSidebarOpen((prevState) => !prevState)
+  }
+
+  // Close sidebar when clicking outside of it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node)
+      ) {
+        setSidebarOpen(false)
+      }
+    }
+
+    if (sidebarOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [sidebarOpen])
+
   return isLoaded ? (
-    <div>
-      {/* Search Section */}
-      <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg z-10">
-        <input
-          type="text"
-          className="border border-gray-300 rounded p-2 w-64"
-          placeholder="Enter Device ID"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button
-          onClick={handleSearch}
-          className="ml-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Search
-        </button>
+    <div className="relative">
+      {/* Hamburger Menu */}
+      <div
+        className="absolute top-2 left-2 bg-white p-4 rounded-full shadow-lg z-20 cursor-pointer"
+        onClick={toggleSidebar}
+      >
+        <GiHamburgerMenu size={24} />
       </div>
 
+      {/* Sidebar */}
+      <div
+        ref={sidebarRef}
+        className={`fixed top-0 left-0 h-full bg-white shadow-lg z-30 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } transition-transform duration-300`}
+      // style={{ width: '500px' }}
+      >
+        <div className="flex items-center justify-between p-4">
+          <h2 className="text-lg font-semibold">Sidebar</h2>
+          <MdClose className="cursor-pointer" size={24} onClick={toggleSidebar} />
+        </div>
+        <SidebarComponent
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          setSelectedDevice={setSelectedDevice}
+          handleSearch={handleSearch}
+          devices={devices}
+          handleSelectedDevice={handleSelectedDevice}
+          selectedDevice={selectedDevice}
+        />
+
+      </div>
+
+      {/* Map Section */}
       <GoogleMap
         mapContainerStyle={containerStyle}
         zoom={2}
         center={userLocation || { lat: 37.7749, lng: -122.4194 }}
+        options={{
+          disableDefaultUI: true,
+          mapTypeControl: false, // Disables the map style switching buttons
+          streetViewControl: false, // Optional: Disable the Street View button
+          fullscreenControl: false, // Optional: Disable the fullscreen button
+        }}
         onLoad={onLoad}
         onUnmount={onUnmount}
       >
         {devices.map((device) => (
           <Marker
+            title={device.deviceId}
+            clickable
             key={device.deviceId}
             position={{
               lat: parseFloat(device.latitude),
@@ -122,51 +208,20 @@ function MyComponent() {
             }}
             label={device.deviceId}
             icon={
-              device.status
+              device.validData
                 ? 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
                 : 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
             }
-            onClick={() => handleMarkerClick(device)} // Show InfoWindow on marker click
+            onClick={() => handleMarkerClick(device)}
           />
         ))}
 
-        {/* InfoWindow for the selected device */}
         {selectedDevice && (
-          <InfoWindow
-            position={{
-              lat: parseFloat(selectedDevice.latitude),
-              lng: parseFloat(selectedDevice.longitude),
-            }}
-            onCloseClick={() => setSelectedDevice(null)} // Close InfoWindow when closed
-          >
-            <div className="bg-white p-4 rounded-lg shadow-lg w-64">
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Device ID: {selectedDevice.deviceId}</h3>
-              <p className="text-sm text-gray-600 mb-1">
-                Status:{' '}
-                <span
-                  className={`font-medium ${selectedDevice.status ? 'text-green-500' : 'text-red-500'
-                    }`}
-                >
-                  {selectedDevice.status ? 'Active' : 'Inactive'}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Latitude: <span className="font-medium">{selectedDevice.latitude}</span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Longitude: <span className="font-medium">{selectedDevice.longitude}</span>
-              </p>
-              <p className="text-sm text-gray-600">
-                Valid Data:{' '}
-                <span
-                  className={`font-medium ${selectedDevice.validData ? 'text-green-500' : 'text-red-500'
-                    }`}
-                >
-                  {selectedDevice.validData ? 'Yes' : 'No'}
-                </span>
-              </p>
-            </div>
-          </InfoWindow>
+          <InfoWindowComponent
+            devices={devices}
+            selectedDevice={selectedDevice}
+            setSelectedDevice={setSelectedDevice}
+          />
         )}
       </GoogleMap>
     </div>
@@ -176,5 +231,3 @@ function MyComponent() {
 }
 
 export default React.memo(MyComponent)
-
-

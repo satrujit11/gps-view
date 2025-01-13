@@ -26,7 +26,13 @@
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"  // Include the 'types' directory for global declarations
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
 
   },
   "include": ["src"]

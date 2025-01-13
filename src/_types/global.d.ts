@@ -1,6 +1,7 @@
 // src/types/global.d.ts
 declare global {
   interface Device {
+    vehicleNumber: string | null;
     deviceId: string;
     status: number;
     latitude: string;
