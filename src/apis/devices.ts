@@ -1,6 +1,6 @@
 import { API_URL } from "../config/api";
 
-export const getDevices = async () => {
+export const getDevices: () => Promise<Device[]> = async () => {
   try {
     const response = await fetch(`${API_URL}api/devices`, {
       method: "GET",

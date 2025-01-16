@@ -4,8 +4,9 @@ import { getDevices } from '../apis/devices'
 import { GiHamburgerMenu } from 'react-icons/gi'
 import InfoWindowComponent from './components/infoWindow.component'
 import SidebarComponent from './components/sidebar.component'
-import { MdClose } from 'react-icons/md'
+import { MdBikeScooter, MdClose } from 'react-icons/md'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 
 const containerStyle = {
   width: '100vw',
@@ -14,7 +15,7 @@ const containerStyle = {
   margin: 0,
 }
 
-function MyComponent() {
+function MapComponent() {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: 'AIzaSyD8G6muA6e85OPCIV6-t92BBdI0XIfZI30',
@@ -28,6 +29,7 @@ function MyComponent() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const sidebarRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
 
   const { data } = useQuery({
@@ -41,7 +43,7 @@ function MyComponent() {
       updateMapBounds(data)
       if (selectedDevice != null) {
         const tempDevice = data.find((device: Device) => device.deviceId === selectedDevice.deviceId)
-        setSelectedDevice(tempDevice)
+        setSelectedDevice(tempDevice ?? null)
       }
     }
   }, [data])
@@ -130,6 +132,10 @@ function MyComponent() {
     setSidebarOpen((prevState) => !prevState)
   }
 
+  const navigateToDevices = () => {
+    navigate('/devices')
+  }
+
   // Close sidebar when clicking outside of it
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -158,6 +164,14 @@ function MyComponent() {
         onClick={toggleSidebar}
       >
         <GiHamburgerMenu size={24} />
+      </div>
+
+
+      <div
+        className="absolute top-2 right-2 bg-white p-4 rounded-full shadow-lg z-20 cursor-pointer"
+        onClick={navigateToDevices}
+      >
+        <MdBikeScooter size={24} />
       </div>
 
       {/* Sidebar */}
@@ -230,4 +244,4 @@ function MyComponent() {
   )
 }
 
-export default React.memo(MyComponent)
+export default React.memo(MapComponent)
