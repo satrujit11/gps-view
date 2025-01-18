@@ -56,7 +56,7 @@ const SidebarComponent: React.FC<SidebarComponentProps> = ({ searchQuery, setSea
                   : 'border border-gray-200 hover:bg-gray-50'
                   }`}
               >
-                <DeviceCardComponent device={device} selectedDevice={selectedDevice} />
+                <DeviceCardComponent device={device} />
               </button>
 
             </li>

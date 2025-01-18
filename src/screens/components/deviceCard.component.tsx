@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { useState } from "react"
 import DeviceEditForm from "./deviceEditForm.component"
 
-const DeviceCardComponent = ({ device, selectedDevice }: { device: Device, selectedDevice: Device | null }) => {
+const DeviceCardComponent = ({ device }: { device: Device }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false)
 
   const queryClient = useQueryClient()
